@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Abstract XP Tracker v5</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --green:#00b85c; --green-bright:#00d96a; --green-dim:#007a3d;
+  --green-pale:#e8fff3; --green-glow:rgba(0,184,92,0.10);
+  --bg:#f5fff9; --bg2:#ffffff; --bg3:#edfaf4;
+  --text:#091a10; --text-dim:#4a7a5e;
+  --border:rgba(0,160,80,0.18); --border-bright:rgba(0,160,80,0.42);
+  --shadow:0 2px 12px rgba(0,160,80,0.07);
+  --pct-up:#007a3d; --pct-down:#c02000; --pct-flat:#4a7a5e; --pct-new:#0050aa;
+  --font-mono:'Space Mono',monospace; --font-ui:'Syne',sans-serif;
+}
+body.dark {
+  --green:#00e870; --green-bright:#00ff8c; --green-dim:#00cc60;
+  --green-pale:rgba(0,232,112,0.09); --green-glow:rgba(0,232,112,0.10);
+  --bg:#050f08; --bg2:#0b1c10; --bg3:#102016;
+  --text:#e0ffec; --text-dim:#7ab890;
+  --border:rgba(0,232,112,0.18); --border-bright:rgba(0,232,112,0.42);
+  --shadow:0 2px 12px rgba(0,0,0,0.35);
+  --pct-up:#00e870; --pct-down:#ff5050; --pct-flat:#a0c8b0; --pct-new:#60aaff;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--font-ui);min-height:100vh;overflow-x:hidden;transition:background .3s,color .3s;}
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle,rgba(0,160,80,0.11) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;z-index:0;}
+body.dark::before{background-image:radial-gradient(circle,rgba(0,232,112,0.07) 1px,transparent 1px);}
+.wrap{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:32px 20px;}
+
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:36px;border-bottom:1px solid var(--border);padding-bottom:22px;flex-wrap:wrap;gap:14px;}
+.logo{display:flex;align-items:center;gap:12px;}
+.logo-icon{width:40px;height:40px;background:var(--green);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 14px rgba(0,184,92,0.3);}
+h1{font-size:21px;font-weight:800;letter-spacing:-.5px;color:var(--green-dim);transition:color .3s;}
+.subtitle{font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px;}
+.header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+#weekDisplay{font-family:var(--font-mono);font-size:11px;color:var(--text-dim);}
+.dark-btn{background:var(--bg3);border:1px solid var(--border-bright);border-radius:20px;padding:6px 14px;cursor:pointer;font-family:var(--font-mono);font-size:11px;color:var(--text-dim);transition:all .2s;}
+.dark-btn:hover{background:var(--green-glow);color:var(--green-dim);}
+
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;box-shadow:var(--shadow);transition:background .3s,border-color .3s;}
+.stat-num{font-family:var(--font-mono);font-size:22px;font-weight:700;color:var(--green-dim);display:block;}
+.stat-label{font-size:10px;color:var(--text-dim);margin-top:3px;font-family:var(--font-mono);}
+
+.tabs{display:flex;gap:4px;margin-bottom:28px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:4px;transition:background .3s,border-color .3s;flex-wrap:wrap;}
+.tab{flex:1;min-width:120px;padding:10px 14px;border:none;background:transparent;color:var(--text-dim);font-family:var(--font-ui);font-weight:600;font-size:13px;cursor:pointer;border-radius:7px;transition:all .2s;text-align:center;}
+.tab.active{background:var(--green);color:#fff;box-shadow:0 3px 10px rgba(0,160,80,0.25);}
+.tab:hover:not(.active){color:var(--green-dim);}
+.panel{display:none;}.panel.active{display:block;}
+
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:18px;box-shadow:var(--shadow);transition:background .3s,border-color .3s;}
+.card-title{font-size:12px;font-weight:700;color:var(--green-dim);font-family:var(--font-mono);letter-spacing:1px;text-transform:uppercase;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.card-title::before{content:'';width:3px;height:14px;background:var(--green);border-radius:2px;}
+
+textarea,input[type="text"],input[type="number"]{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font-mono);font-size:13px;padding:11px 13px;outline:none;transition:border .2s,background .3s;resize:vertical;}
+textarea:focus,input:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--green-glow);}
+textarea{min-height:170px;}
+label{display:block;font-size:11px;font-weight:600;color:var(--text-dim);margin-bottom:5px;font-family:var(--font-mono);}
+
+.btn{padding:10px 18px;border-radius:8px;border:none;font-family:var(--font-ui);font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;}
+.btn-primary{background:var(--green);color:#fff;box-shadow:0 3px 10px rgba(0,160,80,0.22);}
+.btn-primary:hover{background:var(--green-bright);transform:translateY(-1px);}
+.btn-secondary{background:transparent;border:1px solid var(--border-bright);color:var(--green-dim);}
+.btn-secondary:hover{background:var(--green-glow);}
+.btn-danger{background:transparent;border:1px solid rgba(200,30,30,0.3);color:#c83030;}
+.btn-danger:hover{background:rgba(200,30,30,0.07);}
+.btn-sm{padding:5px 11px;font-size:11px;}
+.hint{font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-top:8px;background:var(--bg3);padding:8px 12px;border-radius:6px;border-left:2px solid var(--green);}
+.flex-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.mt{margin-top:14px;}.mb{margin-bottom:14px;}
+
+.user-table{width:100%;border-collapse:collapse;font-size:13px;}
+.user-table th{text-align:left;padding:9px 12px;color:var(--text-dim);font-family:var(--font-mono);font-size:10px;border-bottom:1px solid var(--border);font-weight:400;}
+.user-table td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.user-table tr:hover td{background:var(--green-glow);}
+.pfp-cell{display:flex;align-items:center;gap:10px;}
+.pfp-thumb{width:34px;height:34px;border-radius:50%;border:2px solid var(--border);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:13px;overflow:hidden;flex-shrink:0;color:var(--text-dim);font-family:var(--font-mono);}
+.pfp-thumb img{width:100%;height:100%;object-fit:cover;}
+.rank-badge{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;font-family:var(--font-mono);font-size:10px;font-weight:700;background:var(--bg3);color:var(--text-dim);border:1px solid var(--border);}
+.rank-badge.gold{background:rgba(200,160,0,0.1);color:#b89000;border-color:rgba(200,160,0,0.3);}
+.rank-badge.silver{background:rgba(140,140,140,0.1);color:#888;border-color:rgba(140,140,140,0.3);}
+.rank-badge.bronze{background:rgba(160,90,30,0.1);color:#a05a20;border-color:rgba(160,90,30,0.3);}
+.xp-val{font-family:var(--font-mono);color:var(--green-dim);font-size:13px;font-weight:700;}
+.tag{font-size:9px;padding:2px 7px;border-radius:20px;font-family:var(--font-mono);font-weight:700;}
+.tag-new{background:rgba(0,80,170,0.08);color:var(--pct-new);border:1px solid rgba(0,80,170,0.2);}
+.tag-top{background:rgba(160,120,0,0.08);color:#8a6d00;border:1px solid rgba(160,120,0,0.2);}
+
+.output-box{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:16px;font-family:var(--font-mono);font-size:13px;line-height:1.85;white-space:pre-wrap;max-height:420px;overflow-y:auto;}
+
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--bg2);border:1px solid var(--border-bright);border-radius:16px;padding:26px;width:450px;max-width:95vw;box-shadow:0 10px 40px rgba(0,0,0,0.2);transition:background .3s;}
+.modal-title{font-size:15px;font-weight:800;color:var(--green-dim);margin-bottom:18px;}
+.pfp-options{display:flex;gap:8px;margin-bottom:14px;}
+.pfp-tab-btn{flex:1;padding:7px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-family:var(--font-ui);font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;}
+.pfp-tab-btn.active{background:var(--green-pale);border-color:var(--green);color:var(--green-dim);}
+.pfp-section{display:none;}.pfp-section.active{display:block;}
+.drop-zone{border:2px dashed var(--border-bright);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all .2s;color:var(--text-dim);font-size:13px;}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--green);background:var(--green-pale);color:var(--green-dim);}
+.drop-zone input{display:none;}
+.preview-large{width:76px;height:76px;border-radius:50%;object-fit:cover;border:3px solid var(--green);margin:12px auto 0;display:block;}
+
+.search-input{background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 11px;outline:none;width:190px;transition:border .2s;}
+.search-input:focus{border-color:var(--green);}
+.empty-state{text-align:center;padding:40px;color:var(--text-dim);font-family:var(--font-mono);font-size:13px;}
+.empty-state .icon{font-size:36px;margin-bottom:10px;}
+.week-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:12px;}
+.week-lbl{background:var(--green-pale);border:1px solid var(--border-bright);color:var(--green-dim);font-family:var(--font-mono);font-size:9px;padding:2px 7px;border-radius:4px;}
+::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border-bright);border-radius:3px;}
+#circleCanvas{display:block;margin:0 auto;max-width:100%;border-radius:12px;border:1px solid var(--border);}
+@media(max-width:600px){.stats-row{grid-template-columns:repeat(2,1fr);}header{flex-direction:column;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">⬡</div>
+      <div>
+        <h1>ABSTRACT XP TRACKER</h1>
+        <div class="subtitle">AGW LEADERBOARD SYSTEM // WEEKLY ENGINE</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <span id="weekDisplay">NO DATA LOADED</span>
+      <button class="dark-btn" id="darkToggle" onclick="toggleDark()">🌙 Dark</button>
+    </div>
+  </header>
+
+  <div class="stats-row">
+    <div class="stat-card"><span class="stat-num" id="statTotal">0</span><div class="stat-label">TOTAL USERS</div></div>
+    <div class="stat-card"><span class="stat-num" id="statWith">0</span><div class="stat-label">WITH PFP</div></div>
+    <div class="stat-card"><span class="stat-num" id="statWeeks">0</span><div class="stat-label">WEEKS TRACKED</div></div>
+    <div class="stat-card"><span class="stat-num" id="statTop">—</span><div class="stat-label">TOP USER</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('data')">📥 Data Import</button>
+    <button class="tab" onclick="switchTab('users')">👥 Users &amp; PFP</button>
+    <button class="tab" onclick="switchTab('output')">📋 Text Output</button>
+    <button class="tab" onclick="switchTab('chart')">🫧 Circle Chart</button>
+  </div>
+
+  <!-- DATA IMPORT -->
+  <div class="panel active" id="panel-data">
+    <div class="card">
+      <div class="card-title">Import Weekly XP Data</div>
+      <label>Week Label</label>
+      <input type="text" id="weekLabelInput" placeholder="e.g. Week 1 / Jan 20–26" style="margin-bottom:14px;">
+      <label>Paste All User Data (one per line)</label>
+      <textarea id="dataInput" placeholder="@username1 1234&#10;@username2 5678&#10;username3 999"></textarea>
+      <div class="hint">📌 Formats: <code>@user 1234</code> | <code>user 1234</code> | <code>@user: 1234</code> | <code>user,1234</code></div>
+      <div class="flex-row mt">
+        <button class="btn btn-primary" onclick="importData()">⚡ Import &amp; Process</button>
+        <button class="btn btn-secondary" onclick="clearImport()">Clear</button>
+      </div>
+    </div>
+    <div class="card" id="importResult" style="display:none;">
+      <div class="card-title">Import Summary</div>
+      <div id="importSummaryText" style="font-family:var(--font-mono);font-size:13px;line-height:1.8;"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Week History</div>
+      <div id="weekHistoryList"><div class="empty-state"><div class="icon">📅</div>No weeks imported yet.</div></div>
+    </div>
+  </div>
+
+  <!-- USERS & PFP -->
+  <div class="panel" id="panel-users">
+    <div class="card">
+      <div class="card-title">All Users</div>
+      <div class="flex-row mb">
+        <input class="search-input" type="text" id="userSearch" placeholder="Search @username..." oninput="renderUsersTable()">
+        <button class="btn btn-secondary btn-sm" onclick="openAddUserModal()">+ Add User</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="user-table">
+          <thead><tr><th>RANK</th><th>USER</th><th>LATEST XP</th><th>CHANGE %</th><th>PFP</th><th>ACTION</th></tr></thead>
+          <tbody id="usersTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TEXT OUTPUT -->
+  <div class="panel" id="panel-output">
+    <div class="card">
+      <div class="card-title">Top 50 Formatted Text</div>
+      <div class="flex-row mb">
+        <button class="btn btn-primary" onclick="generateOutput()">🔄 Generate</button>
+        <button class="btn btn-secondary" onclick="copyOutput()">📋 Copy All</button>
+        <button class="btn btn-secondary" onclick="downloadOutputTxt()">⬇️ .txt</button>
+      </div>
+      <div class="output-box" id="outputBox">Click "Generate" to produce top 50 list…</div>
+    </div>
+  </div>
+
+  <!-- CIRCLE CHART -->
+  <div class="panel" id="panel-chart">
+    <div class="card">
+      <div class="card-title">Packed Circle Chart</div>
+      <div class="flex-row mb">
+        <button class="btn btn-primary" onclick="generateChart()">🫧 Generate Chart</button>
+        <button class="btn btn-secondary" onclick="downloadChart()">⬇️ Download PNG</button>
+      </div>
+      <p style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:14px;">
+        🟢 Green = increase &nbsp;|&nbsp; 🔴 Red = decrease &nbsp;|&nbsp; ⚪ White = no change &nbsp;|&nbsp; 🔵 NEW = first time
+      </p>
+      <canvas id="circleCanvas" width="1100" height="1100"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<!-- PFP MODAL -->
+<div class="modal-overlay" id="pfpModal">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">Edit User</div>
+    <div class="pfp-options">
+      <button class="pfp-tab-btn active" onclick="switchPfpTab('upload')">📁 Upload</button>
+      <button class="pfp-tab-btn" onclick="switchPfpTab('paste')">🔗 URL</button>
+      <button class="pfp-tab-btn" onclick="switchPfpTab('edit')">✏️ Edit Info</button>
+    </div>
+    <div class="pfp-section active" id="pfp-upload">
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('pfpFileInput').click()">
+        <input type="file" id="pfpFileInput" accept="image/*" onchange="handleFileSelect(event)">
+        <div>🖼️ Click to upload or drag &amp; drop</div>
+        <div style="font-size:11px;margin-top:5px;color:var(--text-dim);">PNG · JPG · GIF · WEBP</div>
+      </div>
+      <img id="uploadPreview" class="preview-large" style="display:none;" alt="preview">
+    </div>
+    <div class="pfp-section" id="pfp-paste">
+      <label>Image URL or Base64</label>
+      <input type="text" id="pfpUrlInput" placeholder="https://pbs.twimg.com/..." oninput="previewUrl()">
+      <img id="urlPreview" class="preview-large" style="display:none;margin-top:10px;" alt="preview">
+    </div>
+    <div class="pfp-section" id="pfp-edit">
+      <label>Username (without @)</label>
+      <input type="text" id="editUsername" placeholder="username" style="margin-bottom:12px;">
+      <label>XP Override (blank = keep current)</label>
+      <input type="number" id="editXP" placeholder="e.g. 5000">
+    </div>
+    <div class="flex-row mt">
+      <button class="btn btn-primary" onclick="savePfpModal()">✅ Save</button>
+      <button class="btn btn-secondary" onclick="closePfpModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="deleteUser()" style="margin-left:auto;">🗑️ Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD USER MODAL -->
+<div class="modal-overlay" id="addUserModal">
+  <div class="modal">
+    <div class="modal-title">Add New User</div>
+    <label>Username (without @)</label>
+    <input type="text" id="newUsername" placeholder="username" style="margin-bottom:12px;">
+    <label>XP Value</label>
+    <input type="number" id="newXP" placeholder="0" style="margin-bottom:16px;">
+    <div class="flex-row">
+      <button class="btn btn-primary" onclick="addManualUser()">Add User</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('addUserModal').classList.remove('open')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+var state = {
+  users: {},
+  weeks: [],
+  currentModalUser: null,
+  currentPfpData: null
+};
+
+function saveState() {
+  try {
+    localStorage.setItem('axp_v2', JSON.stringify({ users: state.users, weeks: state.weeks }));
+  } catch(e) {}
+}
+
+function loadState() {
+  try {
+    var raw = localStorage.getItem('axp_v2');
+    if (raw) {
+      var p = JSON.parse(raw);
+      state.users = p.users || {};
+      state.weeks = p.weeks || [];
+    }
+  } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════════
+// DARK MODE
+// ═══════════════════════════════════════════════════════════
+function initDarkMode() {
+  if (localStorage.getItem('axp_dark') === '1') {
+    document.body.classList.add('dark');
+    document.getElementById('darkToggle').textContent = '☀️ Light';
+  }
+}
+
+function toggleDark() {
+  var isDark = document.body.classList.toggle('dark');
+  document.getElementById('darkToggle').textContent = isDark ? '☀️ Light' : '🌙 Dark';
+  localStorage.setItem('axp_dark', isDark ? '1' : '0');
+}
+
+// ═══════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════
+function switchTab(name) {
+  var names = ['data', 'users', 'output', 'chart'];
+  var tabs = document.querySelectorAll('.tab');
+  tabs.forEach(function(t, i) { t.classList.toggle('active', names[i] === name); });
+  document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+  document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'users') renderUsersTable();
+  if (name === 'output') generateOutput();
+}
+
+// ═══════════════════════════════════════════════════════════
+// IMPORT
+// ═══════════════════════════════════════════════════════════
+function importData() {
+  var raw = document.getElementById('dataInput').value.trim();
+  var weekLabel = document.getElementById('weekLabelInput').value.trim();
+  if (!weekLabel) weekLabel = 'Week ' + (state.weeks.length + 1);
+  if (!raw) { alert('Data paste karo pehle!'); return; }
+
+  var lines = raw.split('\n');
+  var parsed = {};
+  var skipped = 0;
+
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+    var clean = line.replace(/^@/, '');
+    clean = clean.replace(/(\d),(\d{3})/g, '$1$2');
+    clean = clean.replace(/(\d),(\d{3})/g, '$1$2');
+    var m = clean.match(/^([\w.]+)\s*[:\s,]\s*(\d+)/);
+    if (m) {
+      parsed[m[1].toLowerCase()] = parseInt(m[2], 10);
+    } else {
+      skipped++;
+    }
+  }
+
+  var count = Object.keys(parsed).length;
+  if (count === 0) { alert('Koi valid line nahi mili. Format check karo.'); return; }
+
+  // Mark existing users who are missing this week as XP=0 (absent)
+  var missingCount = 0;
+  Object.keys(state.users).forEach(function(uname) {
+    if (parsed[uname] === undefined) {
+      parsed[uname] = 0;
+      missingCount++;
+    }
+  });
+
+  var weekIdx = state.weeks.length; // index of new week being added
+  state.weeks.push({ label: weekLabel, data: parsed });
+
+  // Update users + compute & store % for this week
+  Object.keys(parsed).forEach(function(uname) {
+    var xp = parsed[uname];
+    if (!state.users[uname]) {
+      state.users[uname] = { xp: xp, pfp: null, weekData: {}, pctHistory: {} };
+    }
+    var u = state.users[uname];
+    if (!u.pctHistory) u.pctHistory = {};
+
+    // Only update displayed XP if user actually appeared (xp > 0)
+    if (xp > 0) u.xp = xp;
+    u.weekData[weekLabel] = xp;
+
+    // Calculate % vs last week they were present
+    if (weekIdx === 0) {
+      u.pctHistory[weekLabel] = 0; // first week = 0%
+    } else if (xp === 0) {
+      u.pctHistory[weekLabel] = null; // absent = no %
+    } else {
+      // Find last week with xp > 0
+      var prevXP = null;
+      for (var wi = weekIdx - 1; wi >= 0; wi--) {
+        var wd = state.weeks[wi].data;
+        if (wd[uname] !== undefined && wd[uname] > 0) {
+          prevXP = wd[uname];
+          break;
+        }
+      }
+      if (prevXP === null) {
+        u.pctHistory[weekLabel] = 'new'; // never seen before
+      } else {
+        u.pctHistory[weekLabel] = parseFloat((((xp - prevXP) / prevXP) * 100).toFixed(1));
+      }
+    }
+  });
+
+  saveState();
+  renderAll();
+
+  document.getElementById('importResult').style.display = 'block';
+  document.getElementById('importSummaryText').innerHTML =
+    '✅ <span style="color:var(--green-dim);font-weight:700;">' + count + ' users</span> imported as <strong>' + weekLabel + '</strong><br>' +
+    '⚠️ ' + skipped + ' lines skipped (bad format)<br>' +
+    '🔘 ' + missingCount + ' existing users marked absent (XP=0) this week<br>' +
+    '📊 Total in system: <span style="color:var(--green-dim);font-weight:700;">' + Object.keys(state.users).length + '</span>';
+
+  document.getElementById('dataInput').value = '';
+  document.getElementById('weekLabelInput').value = '';
+}
+
+function clearImport() {
+  document.getElementById('dataInput').value = '';
+  document.getElementById('weekLabelInput').value = '';
+  document.getElementById('importResult').style.display = 'none';
+}
+
+function deleteWeek(i) {
+  if (!confirm('Delete "' + state.weeks[i].label + '"?')) return;
+  state.weeks.splice(i, 1);
+  saveState();
+  renderAll();
+}
+
+// ═══════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════
+function getTop50() {
+  // Only rank users who appeared in the latest week (xp > 0)
+  var latestWeek = state.weeks.length ? state.weeks[state.weeks.length - 1] : null;
+
+  return Object.entries(state.users)
+    .filter(function(entry) {
+      if (!latestWeek) return true;
+      var xpThisWeek = latestWeek.data[entry[0]];
+      return xpThisWeek !== undefined && xpThisWeek > 0;
+    })
+    .sort(function(a, b) { return (b[1].xp || 0) - (a[1].xp || 0); })
+    .slice(0, 50);
+}
+
+function getPercentChange(username) {
+  // Use stored pctHistory for latest week
+  if (!state.weeks.length) return null;
+  var latestLabel = state.weeks[state.weeks.length - 1].label;
+  var u = state.users[username];
+  if (!u || !u.pctHistory) return null;
+  var stored = u.pctHistory[latestLabel];
+  if (stored === undefined) return null;
+  return stored; // 0, number, 'new', or null
+}
+
+function numEmoji(n) {
+  var digits = ['0️⃣','1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣'];
+  return String(n).split('').map(function(d) { return digits[parseInt(d)]; }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// TEXT OUTPUT
+// ═══════════════════════════════════════════════════════════
+function generateOutput() {
+  var top50 = getTop50();
+  if (!top50.length) {
+    document.getElementById('outputBox').textContent = 'Koi data nahi. Pehle import karo.';
+    return;
+  }
+  var lines = top50.map(function(entry, i) {
+    return numEmoji(i + 1) + ' @' + entry[0] + ': ' + (entry[1].xp || 0).toLocaleString() + ' XP';
+  });
+  document.getElementById('outputBox').textContent = lines.join('\n');
+}
+
+function copyOutput() {
+  var text = document.getElementById('outputBox').textContent;
+  navigator.clipboard.writeText(text).then(function() { showToast('Copied! ✅'); });
+}
+
+function downloadOutputTxt() {
+  var text = document.getElementById('outputBox').textContent;
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+  a.download = 'top50_' + Date.now() + '.txt';
+  a.click();
+}
+
+// ═══════════════════════════════════════════════════════════
+// USERS TABLE
+// ═══════════════════════════════════════════════════════════
+function renderUsersTable() {
+  var tbody = document.getElementById('usersTableBody');
+  var searchEl = document.getElementById('userSearch');
+  var search = searchEl ? searchEl.value.toLowerCase() : '';
+
+  var latestWeek = state.weeks.length ? state.weeks[state.weeks.length - 1] : null;
+
+  // Sort: present users (xp>0 latest week) first by XP desc, then absent users
+  var allUsers = Object.entries(state.users);
+  var present = allUsers.filter(function(e) {
+    return latestWeek && latestWeek.data[e[0]] > 0;
+  }).sort(function(a, b) { return (b[1].xp || 0) - (a[1].xp || 0); });
+
+  var absent = allUsers.filter(function(e) {
+    return !latestWeek || !latestWeek.data[e[0]] || latestWeek.data[e[0]] === 0;
+  }).sort(function(a, b) { return (b[1].xp || 0) - (a[1].xp || 0); });
+
+  var sorted = present.concat(absent);
+  var filtered = search ? sorted.filter(function(e) { return e[0].includes(search); }) : sorted;
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">👥</div>No users yet. Import data first.</div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(function(entry, idx) {
+    var uname = entry[0];
+    var data = entry[1];
+    var isAbsent = latestWeek && (latestWeek.data[uname] === 0 || latestWeek.data[uname] === undefined);
+    var rank = isAbsent ? '—' : (present.findIndex(function(e) { return e[0] === uname; }) + 1);
+    var pct = getPercentChange(uname);
+
+    var pctHtml = '<span style="color:var(--text-dim)">—</span>';
+    if (pct === 'new') {
+      pctHtml = '<span class="tag tag-new">NEW</span>';
+    } else if (pct === null || pct === undefined) {
+      pctHtml = '<span style="color:var(--text-dim)">—</span>';
+    } else if (pct === 0 || pct === '0' || pct === '0.0') {
+      pctHtml = '<span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--pct-flat)">0%</span>';
+    } else {
+      var p = parseFloat(pct);
+      var color = p > 0 ? 'var(--pct-up)' : 'var(--pct-down)';
+      pctHtml = '<span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:' + color + '">' + (p > 0 ? '+' : '') + p.toFixed(1) + '%</span>';
+    }
+
+    var rankNum = typeof rank === 'number' ? rank : null;
+    var rankClass = rankNum === 1 ? 'gold' : rankNum === 2 ? 'silver' : rankNum === 3 ? 'bronze' : '';
+    var rankDisplay = rankNum ? rankNum : '—';
+
+    var pfpHtml = data.pfp
+      ? '<div class="pfp-thumb"><img src="' + data.pfp + '" alt="pfp"></div>'
+      : '<div class="pfp-thumb">' + uname[0].toUpperCase() + '</div>';
+
+    var rowStyle = isAbsent ? 'opacity:0.45;' : '';
+    var absentBadge = isAbsent ? '<span class="tag" style="background:rgba(150,150,150,0.1);color:#888;border:1px solid rgba(150,150,150,0.2);">ABSENT</span>' : (rankNum <= 50 ? '<span class="tag tag-top">TOP50</span>' : '');
+
+    return '<tr style="' + rowStyle + '">' +
+      '<td><span class="rank-badge ' + rankClass + '">' + rankDisplay + '</span></td>' +
+      '<td><div class="pfp-cell">' + pfpHtml +
+        '<span style="font-family:var(--font-mono);font-size:13px;">@' + uname + '</span>' +
+        absentBadge +
+      '</div></td>' +
+      '<td><span class="xp-val">' + (data.xp || 0).toLocaleString() + '</span></td>' +
+      '<td>' + pctHtml + '</td>' +
+      '<td style="font-size:16px;">' + (data.pfp ? '✅' : '❌') + '</td>' +
+      '<td><button class="btn btn-secondary btn-sm" onclick="openPfpModal(\'' + uname + '\')">Edit</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDER ALL
+// ═══════════════════════════════════════════════════════════
+function renderAll() {
+  var users = Object.values(state.users);
+  document.getElementById('statTotal').textContent = users.length;
+  document.getElementById('statWith').textContent = users.filter(function(u) { return u.pfp; }).length;
+  document.getElementById('statWeeks').textContent = state.weeks.length;
+  var sorted = Object.entries(state.users).sort(function(a, b) { return (b[1].xp || 0) - (a[1].xp || 0); });
+  document.getElementById('statTop').textContent = sorted.length ? '@' + sorted[0][0] : '—';
+  document.getElementById('weekDisplay').textContent = state.weeks.length
+    ? 'LATEST: ' + state.weeks[state.weeks.length - 1].label
+    : 'NO DATA LOADED';
+
+  var wEl = document.getElementById('weekHistoryList');
+  if (!state.weeks.length) {
+    wEl.innerHTML = '<div class="empty-state"><div class="icon">📅</div>No weeks imported yet.</div>';
+  } else {
+    wEl.innerHTML = state.weeks.map(function(w, i) {
+      return '<div class="week-item">' +
+        '<span class="week-lbl">W' + (i + 1) + '</span>' +
+        '<span style="color:var(--green-dim);font-weight:700;">' + w.label + '</span>' +
+        '<span style="color:var(--text-dim);">' + Object.keys(w.data).length + ' users</span>' +
+        '<button class="btn btn-danger btn-sm" style="margin-left:auto;" onclick="deleteWeek(' + i + ')">Delete</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  renderUsersTable();
+}
+
+// ═══════════════════════════════════════════════════════════
+// PFP MODAL
+// ═══════════════════════════════════════════════════════════
+function openPfpModal(uname) {
+  state.currentModalUser = uname;
+  state.currentPfpData = (state.users[uname] && state.users[uname].pfp) || null;
+  document.getElementById('modalTitle').textContent = 'Edit @' + uname;
+  document.getElementById('editUsername').value = uname;
+  document.getElementById('editXP').value = (state.users[uname] && state.users[uname].xp) || '';
+  document.getElementById('pfpUrlInput').value = '';
+  document.getElementById('uploadPreview').style.display = 'none';
+  document.getElementById('urlPreview').style.display = 'none';
+  if (state.currentPfpData) {
+    if (state.currentPfpData.startsWith('data:')) {
+      document.getElementById('uploadPreview').src = state.currentPfpData;
+      document.getElementById('uploadPreview').style.display = 'block';
+    } else {
+      document.getElementById('urlPreview').src = state.currentPfpData;
+      document.getElementById('urlPreview').style.display = 'block';
+    }
+  }
+  switchPfpTab('upload');
+  document.getElementById('pfpModal').classList.add('open');
+}
+
+function closePfpModal() {
+  document.getElementById('pfpModal').classList.remove('open');
+  state.currentModalUser = null;
+  state.currentPfpData = null;
+}
+
+function switchPfpTab(name) {
+  var names = ['upload', 'paste', 'edit'];
+  document.querySelectorAll('.pfp-tab-btn').forEach(function(b, i) {
+    b.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.pfp-section').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById('pfp-' + name).classList.add('active');
+}
+
+function handleFileSelect(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    state.currentPfpData = ev.target.result;
+    document.getElementById('uploadPreview').src = ev.target.result;
+    document.getElementById('uploadPreview').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function previewUrl() {
+  var url = document.getElementById('pfpUrlInput').value.trim();
+  if (url) {
+    state.currentPfpData = url;
+    document.getElementById('urlPreview').src = url;
+    document.getElementById('urlPreview').style.display = 'block';
+  }
+}
+
+// Drag & drop
+var dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', function() { dz.classList.remove('drag-over'); });
+dz.addEventListener('drop', function(e) {
+  e.preventDefault(); dz.classList.remove('drag-over');
+  var file = e.dataTransfer.files[0]; if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    state.currentPfpData = ev.target.result;
+    document.getElementById('uploadPreview').src = ev.target.result;
+    document.getElementById('uploadPreview').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+});
+
+function savePfpModal() {
+  var uname = state.currentModalUser;
+  if (!uname) return;
+  var newUname = document.getElementById('editUsername').value.trim().replace(/^@/, '').toLowerCase();
+  var newXP = document.getElementById('editXP').value;
+  var targetName = uname;
+
+  if (newUname && newUname !== uname && state.users[uname]) {
+    state.users[newUname] = JSON.parse(JSON.stringify(state.users[uname]));
+    delete state.users[uname];
+    state.weeks.forEach(function(w) {
+      if (w.data[uname] !== undefined) { w.data[newUname] = w.data[uname]; delete w.data[uname]; }
+    });
+    targetName = newUname;
+  }
+
+  if (state.users[targetName]) {
+    if (state.currentPfpData) state.users[targetName].pfp = state.currentPfpData;
+    if (newXP !== '') state.users[targetName].xp = parseInt(newXP, 10);
+  }
+
+  saveState();
+  closePfpModal();
+  renderAll();
+  showToast('Saved ✅');
+}
+
+function deleteUser() {
+  var uname = state.currentModalUser;
+  if (!confirm('Delete @' + uname + '? Cannot be undone.')) return;
+  delete state.users[uname];
+  state.weeks.forEach(function(w) { delete w.data[uname]; });
+  saveState();
+  closePfpModal();
+  renderAll();
+}
+
+function openAddUserModal() {
+  document.getElementById('newUsername').value = '';
+  document.getElementById('newXP').value = '';
+  document.getElementById('addUserModal').classList.add('open');
+}
+
+function addManualUser() {
+  var uname = document.getElementById('newUsername').value.trim().replace(/^@/, '').toLowerCase();
+  var xp = parseInt(document.getElementById('newXP').value, 10) || 0;
+  if (!uname) { alert('Username daalo'); return; }
+  if (!state.users[uname]) state.users[uname] = { xp: xp, pfp: null, weekData: {} };
+  else state.users[uname].xp = xp;
+  saveState();
+  document.getElementById('addUserModal').classList.remove('open');
+  renderAll();
+  showToast('User added ✅');
+}
+
+// ═══════════════════════════════════════════════════════════
+// CIRCLE CHART
+// ═══════════════════════════════════════════════════════════
+function generateChart() {
+  var top50 = getTop50();
+  if (!top50.length) { alert('Koi data nahi. Pehle import karo.'); return; }
+
+  var canvas = document.getElementById('circleCanvas');
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  var isDark = document.body.classList.contains('dark');
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = isDark ? '#0b1c10' : '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  var circles = packCircles(top50, W, H);
+
+  var pending = 0;
+  circles.forEach(function(c, i) { if (top50[i][1].pfp) pending++; });
+
+  function drawAll() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = isDark ? '#0b1c10' : '#ffffff';
+    ctx.fillRect(0, 0, W, H);
+    circles.forEach(function(c, i) {
+      drawCircle(ctx, c, top50[i][0], top50[i][1], i, isDark);
+    });
+  }
+
+  if (pending === 0) { drawAll(); return; }
+
+  circles.forEach(function(c, i) {
+    var pfp = top50[i][1].pfp;
+    if (!pfp) return;
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function() { c.img = img; pending--; if (pending <= 0) drawAll(); };
+    img.onerror = function() { pending--; if (pending <= 0) drawAll(); };
+    img.src = pfp;
+  });
+
+  drawAll(); // draw immediately, images will reload on load
+}
+
+function packCircles(top50, W, H) {
+  var maxXP = Math.max.apply(null, top50.map(function(e) { return e[1].xp || 1; }));
+  var minXP = Math.min.apply(null, top50.map(function(e) { return e[1].xp || 1; }));
+
+  // Use a much bigger range so size difference is very obvious
+  var minR = 28, maxR = 110;
+
+  var circles = top50.map(function(entry) {
+    var xp = entry[1].xp || 1;
+    // Linear scale based on XP proportion — not sqrt, so difference is dramatic
+    var ratio = (maxXP === minXP) ? 1 : (xp - minXP) / (maxXP - minXP);
+    // Give top user a big circle, last user a small one
+    var r = minR + ratio * (maxR - minR);
+    return {
+      x: W / 2 + (Math.random() - 0.5) * (W * 0.3),
+      y: H / 2 + (Math.random() - 0.5) * (H * 0.3),
+      r: r,
+      img: null
+    };
+  });
+
+  // More iterations + bigger gap for clear separation
+  for (var iter = 0; iter < 500; iter++) {
+    // Pull toward center — weaker pull so large circles don't crush small ones
+    circles.forEach(function(c) {
+      var dx = W / 2 - c.x, dy = H / 2 - c.y;
+      var d = Math.sqrt(dx * dx + dy * dy) || 1;
+      var strength = 0.8;
+      c.x += (dx / d) * strength;
+      c.y += (dy / d) * strength;
+    });
+
+    // Resolve overlaps with clear gap between circles
+    for (var a = 0; a < circles.length; a++) {
+      for (var b = a + 1; b < circles.length; b++) {
+        var ca = circles[a], cb = circles[b];
+        var dx = cb.x - ca.x, dy = cb.y - ca.y;
+        var d = Math.sqrt(dx * dx + dy * dy) || 0.01;
+        var gap = 8; // clear gap between circles
+        var minDist = ca.r + cb.r + gap;
+        if (d < minDist) {
+          var push = (minDist - d) / 2;
+          var nx = dx / d, ny = dy / d;
+          ca.x -= nx * push; ca.y -= ny * push;
+          cb.x += nx * push; cb.y += ny * push;
+        }
+      }
+    }
+
+    // Keep in bounds with padding
+    circles.forEach(function(c) {
+      var pad = 6;
+      c.x = Math.max(c.r + pad, Math.min(W - c.r - pad, c.x));
+      c.y = Math.max(c.r + pad, Math.min(H - c.r - pad, c.y));
+    });
+  }
+  return circles;
+}
+
+function drawCircle(ctx, c, uname, data, rank, isDark) {
+  var pct = getPercentChange(uname);
+  var pctText = '0%', pctDir = 'flat';
+
+  if (pct === 'new') {
+    pctText = 'NEW'; pctDir = 'new';
+  } else if (pct === null || pct === undefined) {
+    pctText = '0%'; pctDir = 'flat';
+  } else if (pct === 0) {
+    pctText = '0%'; pctDir = 'flat';
+  } else {
+    var p = parseFloat(pct);
+    pctText = (p > 0 ? '+' : '') + p.toFixed(1) + '%';
+    pctDir = p > 0 ? 'up' : 'down';
+  }
+
+  var pctColors = {
+    up:   isDark ? '#00e870' : '#005c28',
+    down: isDark ? '#ff5050' : '#c02000',
+    flat: '#ffffff',
+    new:  isDark ? '#60aaff' : '#0050aa'
+  };
+  var pctFill = pctColors[pctDir];
+  var pctStroke = 'rgba(0,0,0,0.65)';
+
+  // Clip & draw fill
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+  ctx.clip();
+
+  if (c.img) {
+    ctx.drawImage(c.img, c.x - c.r, c.y - c.r, c.r * 2, c.r * 2);
+    ctx.fillStyle = isDark ? 'rgba(0,0,0,0.25)' : 'rgba(0,0,0,0.15)';
+    ctx.fillRect(c.x - c.r, c.y - c.r, c.r * 2, c.r * 2);
+  } else {
+    var g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, c.r);
+    if (isDark) { g.addColorStop(0, '#1e3d28'); g.addColorStop(1, '#0b1c10'); }
+    else        { g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#c8f5de'); }
+    ctx.fillStyle = g; ctx.fill();
+    ctx.fillStyle = isDark ? '#00e870' : '#006b30';
+    ctx.font = 'bold ' + Math.max(16, c.r * .48) + 'px Syne,sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(uname[0].toUpperCase(), c.x, c.y - c.r * .1);
+  }
+  ctx.restore();
+
+  // Border
+  ctx.beginPath();
+  ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+  var border = rank === 0 ? '#c8a000' : rank === 1 ? '#888888' : rank === 2 ? '#a05a20'
+    : (isDark ? 'rgba(0,232,112,0.48)' : 'rgba(0,160,80,0.48)');
+  ctx.strokeStyle = border;
+  ctx.lineWidth = rank < 3 ? 3.5 : 1.5;
+  ctx.stroke();
+
+  if (rank < 3) {
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.r + 5, 0, Math.PI * 2);
+    ctx.strokeStyle = border.replace('rgb', 'rgba').replace(')', ',0.25)');
+    ctx.lineWidth = 5; ctx.stroke();
+  }
+
+  // Percentage — BIGGER
+  var fSize = Math.max(13, Math.min(22, c.r * 0.34));
+  ctx.font = 'bold ' + fSize + 'px Space Mono,monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = pctStroke;
+  ctx.lineWidth = 4;
+  ctx.strokeText(pctText, c.x, c.y + c.r - 7);
+  ctx.fillStyle = pctFill;
+  ctx.fillText(pctText, c.x, c.y + c.r - 7);
+}
+
+function downloadChart() {
+  var canvas = document.getElementById('circleCanvas');
+  var a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = 'abstract_xp_' + Date.now() + '.png';
+  a.click();
+}
+
+// ═══════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════
+function showToast(msg) {
+  var t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:var(--green);color:#fff;' +
+    'padding:10px 20px;border-radius:8px;font-family:var(--font-mono);font-weight:700;font-size:13px;' +
+    'z-index:9999;box-shadow:0 4px 20px rgba(0,160,80,0.35);transition:opacity .3s;';
+  document.body.appendChild(t);
+  setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { t.remove(); }, 300); }, 1800);
+}
+
+// ═══════════════════════════════════════════════════════════
+// BOOT — runs after DOM is fully ready
+// ═══════════════════════════════════════════════════════════
+loadState();
+initDarkMode();
+renderAll();
+</script>
+</body>
+</html>
