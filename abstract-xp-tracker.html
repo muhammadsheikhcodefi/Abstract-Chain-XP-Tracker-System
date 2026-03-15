@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Abstract XP Tracker v5</title>
+<title>Abstract XP Tracker v6</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -128,6 +128,8 @@ label{display:block;font-size:11px;font-weight:600;color:var(--text-dim);margin-
     </div>
     <div class="header-right">
       <span id="weekDisplay">NO DATA LOADED</span>
+      <button class="dark-btn" onclick="exportJSON()" style="background:var(--green-pale);border-color:var(--green);">⬇️ Export JSON</button>
+      <label class="dark-btn" style="cursor:pointer;background:var(--green-pale);border-color:var(--green);">📂 Import JSON<input type="file" accept=".json" onchange="importJSON(event)" style="display:none;"></label>
       <button class="dark-btn" id="darkToggle" onclick="toggleDark()">🌙 Dark</button>
     </div>
   </header>
@@ -434,14 +436,17 @@ function deleteWeek(i) {
 // HELPERS
 // ═══════════════════════════════════════════════════════════
 function getTop50() {
-  // Only rank users who appeared in the latest week (xp > 0)
   var latestWeek = state.weeks.length ? state.weeks[state.weeks.length - 1] : null;
 
   return Object.entries(state.users)
     .filter(function(entry) {
-      if (!latestWeek) return true;
-      var xpThisWeek = latestWeek.data[entry[0]];
-      return xpThisWeek !== undefined && xpThisWeek > 0;
+      var uname = entry[0];
+      var udata = entry[1];
+      if (!latestWeek) return udata.xp > 0; // no weeks yet — show if xp > 0
+      var xpThisWeek = latestWeek.data[uname];
+      // Include if: present this week with xp > 0, OR manually added (no week entry but xp > 0)
+      if (xpThisWeek !== undefined) return xpThisWeek > 0;
+      return udata.xp > 0 && udata.manualAdd === true;
     })
     .sort(function(a, b) { return (b[1].xp || 0) - (a[1].xp || 0); })
     .slice(0, 50);
@@ -522,7 +527,9 @@ function renderUsersTable() {
   tbody.innerHTML = filtered.map(function(entry, idx) {
     var uname = entry[0];
     var data = entry[1];
-    var isAbsent = latestWeek && (latestWeek.data[uname] === 0 || latestWeek.data[uname] === undefined);
+    var isAbsent = latestWeek
+      && !data.manualAdd
+      && (latestWeek.data[uname] === 0 || latestWeek.data[uname] === undefined);
     var rank = isAbsent ? '—' : (present.findIndex(function(e) { return e[0] === uname; }) + 1);
     var pct = getPercentChange(uname);
 
@@ -572,8 +579,11 @@ function renderAll() {
   document.getElementById('statTotal').textContent = users.length;
   document.getElementById('statWith').textContent = users.filter(function(u) { return u.pfp; }).length;
   document.getElementById('statWeeks').textContent = state.weeks.length;
-  var sorted = Object.entries(state.users).sort(function(a, b) { return (b[1].xp || 0) - (a[1].xp || 0); });
-  document.getElementById('statTop').textContent = sorted.length ? '@' + sorted[0][0] : '—';
+
+  // Top user = #1 in latest week only (not all-time)
+  var top50Now = getTop50();
+  document.getElementById('statTop').textContent = top50Now.length ? '@' + top50Now[0][0] : '—';
+
   document.getElementById('weekDisplay').textContent = state.weeks.length
     ? 'LATEST: ' + state.weeks[state.weeks.length - 1].label
     : 'NO DATA LOADED';
@@ -583,10 +593,12 @@ function renderAll() {
     wEl.innerHTML = '<div class="empty-state"><div class="icon">📅</div>No weeks imported yet.</div>';
   } else {
     wEl.innerHTML = state.weeks.map(function(w, i) {
+      // Count only users who actually had xp > 0 that week (not auto-zeroed ones)
+      var realCount = Object.keys(w.data).filter(function(u) { return w.data[u] > 0; }).length;
       return '<div class="week-item">' +
         '<span class="week-lbl">W' + (i + 1) + '</span>' +
         '<span style="color:var(--green-dim);font-weight:700;">' + w.label + '</span>' +
-        '<span style="color:var(--text-dim);">' + Object.keys(w.data).length + ' users</span>' +
+        '<span style="color:var(--text-dim);">' + realCount + ' users</span>' +
         '<button class="btn btn-danger btn-sm" style="margin-left:auto;" onclick="deleteWeek(' + i + ')">Delete</button>' +
       '</div>';
     }).join('');
@@ -719,8 +731,40 @@ function addManualUser() {
   var uname = document.getElementById('newUsername').value.trim().replace(/^@/, '').toLowerCase();
   var xp = parseInt(document.getElementById('newXP').value, 10) || 0;
   if (!uname) { alert('Username daalo'); return; }
-  if (!state.users[uname]) state.users[uname] = { xp: xp, pfp: null, weekData: {} };
-  else state.users[uname].xp = xp;
+
+  var isNew = !state.users[uname];
+
+  if (isNew) {
+    state.users[uname] = { xp: xp, pfp: null, weekData: {}, pctHistory: {}, manualAdd: true };
+  } else {
+    state.users[uname].xp = xp;
+    state.users[uname].manualAdd = true;
+  }
+
+  // Register in latest week so getTop50 picks them up
+  if (state.weeks.length > 0) {
+    var latestWeek = state.weeks[state.weeks.length - 1];
+    latestWeek.data[uname] = xp;
+    state.users[uname].weekData[latestWeek.label] = xp;
+
+    // Set pctHistory for latest week
+    if (!state.users[uname].pctHistory) state.users[uname].pctHistory = {};
+
+    if (state.weeks.length === 1) {
+      // Only one week — first time ever
+      state.users[uname].pctHistory[latestWeek.label] = isNew ? 'new' : 0;
+    } else {
+      // Check if they existed in any previous week
+      var hadBefore = false;
+      for (var wi = 0; wi < state.weeks.length - 1; wi++) {
+        if (state.weeks[wi].data[uname] !== undefined && state.weeks[wi].data[uname] > 0) {
+          hadBefore = true; break;
+        }
+      }
+      state.users[uname].pctHistory[latestWeek.label] = isNew || !hadBefore ? 'new' : 0;
+    }
+  }
+
   saveState();
   document.getElementById('addUserModal').classList.remove('open');
   renderAll();
@@ -735,41 +779,63 @@ function generateChart() {
   if (!top50.length) { alert('Koi data nahi. Pehle import karo.'); return; }
 
   var canvas = document.getElementById('circleCanvas');
-  var ctx = canvas.getContext('2d');
-  var W = canvas.width, H = canvas.height;
   var isDark = document.body.classList.contains('dark');
 
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = isDark ? '#0b1c10' : '#ffffff';
-  ctx.fillRect(0, 0, W, H);
+  // HiDPI: render at 3x for sharp download
+  var SCALE = 3;
+  var DISPLAY_W = 1100, DISPLAY_H = 1100;
+  canvas.width  = DISPLAY_W * SCALE;
+  canvas.height = DISPLAY_H * SCALE;
+  canvas.style.width  = DISPLAY_W + 'px';
+  canvas.style.height = DISPLAY_H + 'px';
+
+  var ctx = canvas.getContext('2d');
+  ctx.scale(SCALE, SCALE);
+
+  var W = DISPLAY_W, H = DISPLAY_H;
 
   var circles = packCircles(top50, W, H);
 
-  var pending = 0;
-  circles.forEach(function(c, i) { if (top50[i][1].pfp) pending++; });
+  // Count images to load
+  var toLoad = 0;
+  circles.forEach(function(c, i) { if (top50[i][1].pfp) toLoad++; });
+  var loaded = 0;
 
   function drawAll() {
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = isDark ? '#0b1c10' : '#ffffff';
-    ctx.fillRect(0, 0, W, H);
+    // Transparent background — good for PNG
+    // If dark mode fill dark bg, else keep transparent (white bg for light)
+    if (isDark) {
+      ctx.fillStyle = '#0b1c10';
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      ctx.clearRect(0, 0, W, H); // transparent PNG
+    }
     circles.forEach(function(c, i) {
       drawCircle(ctx, c, top50[i][0], top50[i][1], i, isDark);
     });
   }
 
-  if (pending === 0) { drawAll(); return; }
+  if (toLoad === 0) { drawAll(); return; }
 
   circles.forEach(function(c, i) {
     var pfp = top50[i][1].pfp;
     if (!pfp) return;
     var img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = function() { c.img = img; pending--; if (pending <= 0) drawAll(); };
-    img.onerror = function() { pending--; if (pending <= 0) drawAll(); };
+    img.onload = function() {
+      c.img = img;
+      loaded++;
+      if (loaded >= toLoad) drawAll();
+    };
+    img.onerror = function() {
+      loaded++;
+      if (loaded >= toLoad) drawAll();
+    };
     img.src = pfp;
+    // Timeout fallback — if images don't load in 3s, draw anyway
+    setTimeout(function() { if (loaded < toLoad) { loaded = toLoad; drawAll(); } }, 3000);
   });
-
-  drawAll(); // draw immediately, images will reload on load
 }
 
 function packCircles(top50, W, H) {
@@ -847,63 +913,74 @@ function drawCircle(ctx, c, uname, data, rank, isDark) {
     pctDir = p > 0 ? 'up' : 'down';
   }
 
-  var pctColors = {
-    up:   isDark ? '#00e870' : '#005c28',
-    down: isDark ? '#ff5050' : '#c02000',
-    flat: '#ffffff',
-    new:  isDark ? '#60aaff' : '#0050aa'
-  };
-  var pctFill = pctColors[pctDir];
-  var pctStroke = 'rgba(0,0,0,0.65)';
+  // % text fill colors — exactly like sample: green=up, red=down, white=flat
+  var pctFill = pctDir === 'up' ? '#00cc44'
+              : pctDir === 'down' ? '#ff3333'
+              : pctDir === 'new' ? '#4499ff'
+              : '#ffffff';
 
-  // Clip & draw fill
+  // Clip & draw circle fill
   ctx.save();
   ctx.beginPath();
   ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
   ctx.clip();
 
   if (c.img) {
+    // Draw pfp — NO overlay, full brightness
     ctx.drawImage(c.img, c.x - c.r, c.y - c.r, c.r * 2, c.r * 2);
-    ctx.fillStyle = isDark ? 'rgba(0,0,0,0.25)' : 'rgba(0,0,0,0.15)';
-    ctx.fillRect(c.x - c.r, c.y - c.r, c.r * 2, c.r * 2);
   } else {
+    // No pfp — gradient fill + initial letter
     var g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, c.r);
     if (isDark) { g.addColorStop(0, '#1e3d28'); g.addColorStop(1, '#0b1c10'); }
-    else        { g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#c8f5de'); }
-    ctx.fillStyle = g; ctx.fill();
+    else        { g.addColorStop(0, '#f0fff6'); g.addColorStop(1, '#b8f0d4'); }
+    ctx.fillStyle = g;
+    ctx.fill();
     ctx.fillStyle = isDark ? '#00e870' : '#006b30';
     ctx.font = 'bold ' + Math.max(16, c.r * .48) + 'px Syne,sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(uname[0].toUpperCase(), c.x, c.y - c.r * .1);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(uname[0].toUpperCase(), c.x, c.y - c.r * .12);
   }
   ctx.restore();
 
-  // Border
+  // Border ring
   ctx.beginPath();
   ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
-  var border = rank === 0 ? '#c8a000' : rank === 1 ? '#888888' : rank === 2 ? '#a05a20'
-    : (isDark ? 'rgba(0,232,112,0.48)' : 'rgba(0,160,80,0.48)');
+  var border = rank === 0 ? '#e6b800'
+             : rank === 1 ? '#aaaaaa'
+             : rank === 2 ? '#c07840'
+             : (isDark ? 'rgba(0,232,112,0.5)' : 'rgba(0,160,80,0.5)');
   ctx.strokeStyle = border;
-  ctx.lineWidth = rank < 3 ? 3.5 : 1.5;
+  ctx.lineWidth = rank < 3 ? 4 : 2;
   ctx.stroke();
 
+  // Outer glow for top 3
   if (rank < 3) {
     ctx.beginPath();
-    ctx.arc(c.x, c.y, c.r + 5, 0, Math.PI * 2);
-    ctx.strokeStyle = border.replace('rgb', 'rgba').replace(')', ',0.25)');
-    ctx.lineWidth = 5; ctx.stroke();
+    ctx.arc(c.x, c.y, c.r + 6, 0, Math.PI * 2);
+    ctx.strokeStyle = rank === 0 ? 'rgba(230,184,0,0.3)'
+                    : rank === 1 ? 'rgba(170,170,170,0.25)'
+                    : 'rgba(192,120,64,0.3)';
+    ctx.lineWidth = 6;
+    ctx.stroke();
   }
 
-  // Percentage — BIGGER
-  var fSize = Math.max(13, Math.min(22, c.r * 0.34));
+  // ── % text — big, bold, like sample image ──
+  // Font size: large relative to circle, but capped
+  var fSize = Math.max(14, Math.min(28, c.r * 0.38));
   ctx.font = 'bold ' + fSize + 'px Space Mono,monospace';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
   ctx.lineJoin = 'round';
-  ctx.strokeStyle = pctStroke;
-  ctx.lineWidth = 4;
-  ctx.strokeText(pctText, c.x, c.y + c.r - 7);
+
+  // Thick black/dark outline for readability over any pfp
+  ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+  ctx.lineWidth = fSize * 0.28;
+  ctx.strokeText(pctText, c.x, c.y + c.r - 8);
+
+  // Colored fill on top
   ctx.fillStyle = pctFill;
-  ctx.fillText(pctText, c.x, c.y + c.r - 7);
+  ctx.fillText(pctText, c.x, c.y + c.r - 8);
 }
 
 function downloadChart() {
@@ -912,6 +989,41 @@ function downloadChart() {
   a.href = canvas.toDataURL('image/png');
   a.download = 'abstract_xp_' + Date.now() + '.png';
   a.click();
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXPORT / IMPORT JSON
+// ═══════════════════════════════════════════════════════════
+function exportJSON() {
+  var data = { users: state.users, weeks: state.weeks, exportedAt: new Date().toISOString() };
+  var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'abstract_xp_backup_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  showToast('Exported ✅');
+}
+
+function importJSON(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var parsed = JSON.parse(e.target.result);
+      if (!parsed.users || !parsed.weeks) { alert('Invalid file — users ya weeks data nahi mila.'); return; }
+      if (!confirm('Ye import current data ko replace kar dega. Sure?')) return;
+      state.users = parsed.users;
+      state.weeks = parsed.weeks;
+      saveState();
+      renderAll();
+      showToast('Imported ✅');
+    } catch(err) {
+      alert('JSON parse error: ' + err.message);
+    }
+    event.target.value = ''; // reset so same file can be re-imported
+  };
+  reader.readAsText(file);
 }
 
 // ═══════════════════════════════════════════════════════════
